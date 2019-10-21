@@ -1,0 +1,130 @@
+/*
+  Universal 8bit Graphics Library (http://code.google.com/p/u8g2/)
+  Copyright (c) 2016, olikraus@gmail.com
+  All rights reserved.
+*/
+
+//Importes de la librenia u8g2 
+#include <U8x8lib.h>
+#include <Arduino.h>
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
+
+U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/ SCL, /* data=*/ SDA, /* reset=*/ U8X8_PIN_NONE);   // OLEDs without Reset of the Display
+
+//Definir pin de la pantalla OLED
+int pinOLED= A4;
+
+///voltimetro
+//Definir Pin de donde se va a medir el voltaje
+
+int pinVoltajeInicial= A0;  //pin Voltaje inicial
+//int pinLecturaDeVoltaje= A0;
+
+float voltajeInicial;
+float voltajeFinal;
+
+float escala = 100;         //100=volts
+float constanteDeCambio= 0.003125;
+
+void setup(void){
+
+  //Iniciar pantalla OLED
+  u8x8.begin();
+  
+  //voltimetro
+  Serial.begin (9600);
+  pinMode(pinVoltajeInicial,INPUT);
+  pinMode(2,INPUT);
+  pinMode(pinOLED,OUTPUT);
+  pinMode(5,OUTPUT);
+  pinMode(12,OUTPUT);
+  pinMode(7,OUTPUT);
+  
+}
+
+//Funcion para "resetear" pantalla OLED cada cíclo
+void pre(void){
+  
+  u8x8.setFont(u8x8_font_victoriabold8_u);  
+  u8x8.inverse();
+  u8x8.print(" GAUSSIMETRO    ");
+  u8x8.setFont(u8x8_font_chroma48medium8_r);  
+  u8x8.noInverse();
+
+}
+
+void loop(void){
+  
+  digitalWrite(7, HIGH);
+  
+/*----------CODIGO DEL VOLTAJE (START) ---------------------------------------------------------------------------------------------------*/
+  float lecturaVoltajeInicial =analogRead(pinVoltajeInicial);
+  
+  lecturaVoltajeInicial = map(lecturaVoltajeInicial, 0, 1023, 0, 500);
+/*----------CODIGO DEL VOLTAJE (END)------------------------------------------------------------------------------------------------------*/
+
+/*----------PANTALLA OLED (START) --------------------------------------------------------------------------------------------------------*/
+  u8x8.setCursor(0,0);
+  pre();
+  u8x8.setCursor(10,7);
+  u8x8.print(lecturaVoltajeInicial/100);
+  u8x8.setCursor(14,7);
+  u8x8.print("V");
+  //u8x8.draw2x2String(3, 4, lecturaVoltajeInicial);  
+/*----------PANTALLA OLED (END)------------------------------------------------------------------------------------------------------------------*/
+
+/*----------REGISTRO DISTANCIA (START) ----------------------------------------------------------------------------------------------------------*/
+  boolean distancia= digitalRead(2);
+  u8x8.setCursor(0,7);
+  if (distancia== LOW){
+    u8x8.print("Lejos");
+    //digitalWrite(5, HIGH);
+    //digitalWrite(12, LOW);
+    voltajeInicial= (lecturaVoltajeInicial/100); 
+  }else {
+    u8x8.print("Cerca");
+    //digitalWrite(12, HIGH);
+    //digitalWrite(5, LOW);
+    voltajeFinal= (lecturaVoltajeInicial/100); 
+  }
+  float resultado= ((voltajeFinal - voltajeInicial)/constanteDeCambio);
+/*----------REGISTRO DISTANCIA (END)--------------------------------------------------------------------------------------------------------------*/
+  
+/*----------INDICADORES DE POLO (START) ----------------------------------------------------------------------------------------------------------*/
+  if (resultado > 0){
+    //Lejos
+    digitalWrite(5, HIGH);
+    digitalWrite(12, LOW);
+  } else if (resultado < 0){
+    //Cerca
+    digitalWrite(12, HIGH);
+    digitalWrite(5, LOW);
+  } else {
+    digitalWrite(12, LOW);
+    digitalWrite(5, LOW);
+  }
+/*----------INDICADORES DE POLO (END) ------------------------------------------------------------------------------------------------------------*/
+  
+  Serial.println("Voltaje inicial (Lejos)");
+  Serial.println(voltajeInicial);
+  Serial.println("Voltaje final (Cerca)");
+  Serial.println(voltajeFinal);
+  Serial.println("Diferencia");
+  Serial.println(voltajeFinal - voltajeInicial);
+  Serial.println("Resultado");
+  Serial.println(resultado);
+  Serial.println("//-------------------------------------------------------------------------//");
+
+  u8x8.setCursor(4,4);
+  u8x8.print(resultado);
+  u8x8.setCursor(12,4);
+  u8x8.print("G");
+  
+  delay(3000);
+ 
+}
